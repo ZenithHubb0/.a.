@@ -1,0 +1,250 @@
+---------------------------------------
+-- CONFIG
+---------------------------------------
+local menuKey = "PgUp"
+local pullKey = "n"
+local pullSpeed = 0.15
+local pullDistance = 30
+local columns = 5
+
+---------------------------------------
+-- ESTADO
+---------------------------------------
+local menuOpen = false
+local selectedIDs = {} -- [id] = true
+
+local menuX, menuY = 0.15, 0.07
+local menuW, menuH = 0.70, 0.82
+local dragging = false
+local dragX, dragY = 0, 0
+
+local editingDistance = false
+local distanceText = "30"
+
+---------------------------------------
+-- CATEGORIAS
+---------------------------------------
+local categories = {
+    ["MOCHILAS"]={{1974,"Field Green"},{1899,"Field Black"},{1909,"Field Camo"}},
+    ["COLETES NORMAIS"]={{1952,"Police Vest"},{1955,"Press Vest"}},
+    ["RIFLES"]={{2347,"AK74"},{2348,"AK101"},{2288,"SA-58"},{1509,"AKM"},{1950,"AUG"},{1951,"FAL"},{1512,"M4"},{1487,"M249"}},
+    ["SNIPERS"]={{2613,"Mosin"},{1943,"M70 Tundra"},{1485,"VS-89"},{2105,"Barrett"}},
+    ["MUNICAO"]={{{1863,2966},"5.45x39"},{{1864,2176},"5.56x45"},{{1865,1664},"7.62x39"},{{1869,1543},"308 Win"},{{2352,3044},"50 BMG"}},
+    ["MEDICO"]={{2902,"Saline"},{2274,"Blood Bag"},{2855,"Morphine"},{1840,"Bandage"}},
+    ["CAPACETE"]={{1486,"Capa Verde"},{1835,"K6"},{2325,"K6 Ghillie"},{1832,"Gasmask"},{2785,"Capa Verde Ghillie"},{2349,"Gasmask Ghillie"},{2752,"Capa Preto"},{1895,"Capa Preto Ghillie"}},
+    ["TENDAS"]={{1898,"Tenda de Carro"},{1666,"Tenda Média"},{2958,"Tenda Grande"},{2751,"Tenda"}},
+    ["CARRO"]={{2293,"Vela"},{2079,"Bateria"},{2224,"Radiador"}},
+    ["OUTROS"]={{5171,"Radio"},{1581,"Cartão do Bunker"},{1589,"Roupa"}},
+    ["PLATE"]={{{1875,1876,2053,1954,2869,1957,2500},"Todos Plates"}},
+}
+
+---------------------------------------
+-- FUNÇÕES AUX (CORRIGIDAS)
+---------------------------------------
+local function setCategory(cat, state)
+    for _,item in ipairs(categories[cat]) do
+        if type(item[1]) == "table" then
+            for _,id in ipairs(item[1]) do
+                selectedIDs[id] = state
+            end
+        else
+            selectedIDs[item[1]] = state
+        end
+    end
+end
+
+local function isCategoryChecked(cat)
+    for _,item in ipairs(categories[cat]) do
+        if type(item[1]) == "table" then
+            for _,id in ipairs(item[1]) do
+                if not selectedIDs[id] then return false end
+            end
+        else
+            if not selectedIDs[item[1]] then return false end
+        end
+    end
+    return true
+end
+
+local function applyDistance()
+    local v = tonumber(distanceText)
+    if v then
+        pullDistance = math.max(1, math.min(9999, v))
+    end
+end
+
+---------------------------------------
+-- RENDER
+---------------------------------------
+local sx, sy = guiGetScreenSize()
+
+addEventHandler("onClientRender", root, function()
+    if not menuOpen then return end
+
+    local x,y,w,h = sx*menuX, sy*menuY, sx*menuW, sy*menuH
+
+    dxDrawRectangle(x,y,w,h,tocolor(10,10,10,210))
+    dxDrawRectangle(x,y,w,30,tocolor(25,25,25,240))
+    dxDrawText("MENU PUXAR OBJETOS",x,y,x+w,y+30,tocolor(255,255,255),0.95,"default-bold","center","center")
+
+    dxDrawText("Dist:",x+14,y+36,x+120,y+54,tocolor(200,200,200),0.75)
+    dxDrawRectangle(x+70,y+36,100,18, editingDistance and tocolor(70,70,70) or tocolor(35,35,35))
+    dxDrawText(distanceText,x+70,y+36,x+170,y+54,tocolor(0,200,255),0.75,"default-bold","center","center")
+
+    local startY = y + 70
+    local startX = x + 14
+    local colW = (w-28)/columns
+    local col,row = 0,0
+
+    for cat,items in pairs(categories) do
+        local bx = startX + col*colW
+        local by = startY + row*220
+
+        dxDrawRectangle(bx,by,16,16,tocolor(90,90,90))
+        if isCategoryChecked(cat) then
+            dxDrawRectangle(bx+4,by+4,8,8,tocolor(0,180,0))
+        end
+        dxDrawText(cat,bx+22,by,bx+colW,by+16,tocolor(255,170,0),0.8,"default-bold","left","center")
+
+        local iy = by + 28
+        for _,data in ipairs(items) do
+            dxDrawRectangle(bx,iy,16,16,tocolor(55,55,55))
+            if type(data[1]) == "table" then
+                if selectedIDs[data[1][1]] then
+                    dxDrawRectangle(bx+4,iy+4,8,8,tocolor(0,180,0))
+                end
+            else
+                if selectedIDs[data[1]] then
+                    dxDrawRectangle(bx+4,iy+4,8,8,tocolor(0,180,0))
+                end
+            end
+
+            dxDrawText(data[2],bx+22,iy,bx+colW,iy+16,tocolor(235,235,235),0.75,"default","left","center")
+            iy = iy + 22
+        end
+
+        col = col + 1
+        if col >= columns then col = 0 row = row + 1 end
+    end
+end)
+
+---------------------------------------
+-- CLICK / INPUT / DRAG
+---------------------------------------
+addEventHandler("onClientClick", root, function(btn,state,cx,cy)
+    if not menuOpen then return end
+
+    local x,y,w = sx*menuX, sy*menuY, sx*menuW
+
+    if btn=="left" and state=="down" then
+        if cx>=x and cx<=x+w and cy>=y and cy<=y+30 then
+            dragging=true
+            dragX,dragY=cx-x,cy-y
+            return
+        end
+        if cx>=x+70 and cx<=x+170 and cy>=y+36 and cy<=y+54 then
+            editingDistance=true
+            return
+        end
+    end
+
+    if btn=="left" and state=="up" then
+        if editingDistance then applyDistance() end
+        dragging=false
+        editingDistance=false
+    end
+
+    local startY=y+70
+    local startX=x+14
+    local colW=(w-28)/columns
+    local col,row=0,0
+
+    if btn=="left" and state=="down" then
+        for cat,items in pairs(categories) do
+            local bx=startX+col*colW
+            local by=startY+row*220
+
+            if cx>=bx and cx<=bx+16 and cy>=by and cy<=by+16 then
+                setCategory(cat, not isCategoryChecked(cat))
+                return
+            end
+
+            local iy=by+28
+            for _,data in ipairs(items) do
+                if cx>=bx and cx<=bx+16 and cy>=iy and cy<=iy+16 then
+                    if type(data[1]) == "table" then
+                        local newState = not selectedIDs[data[1][1]]
+                        for _,id in ipairs(data[1]) do
+                            selectedIDs[id] = newState
+                        end
+                    else
+                        selectedIDs[data[1]] = not selectedIDs[data[1]]
+                    end
+                    return
+                end
+                iy=iy+22
+            end
+
+            col=col+1
+            if col>=columns then col=0 row=row+1 end
+        end
+    end
+end)
+
+addEventHandler("onClientCursorMove",root,function(_,_,cx,cy)
+    if dragging then
+        menuX=(cx-dragX)/sx
+        menuY=(cy-dragY)/sy
+    end
+end)
+
+addEventHandler("onClientCharacter",root,function(c)
+    if editingDistance and c:match("%d") then
+        distanceText=distanceText..c
+    end
+end)
+
+bindKey("backspace","down",function()
+    if editingDistance then distanceText=distanceText:sub(1,-2) end
+end)
+
+bindKey("enter","down",function()
+    if editingDistance then applyDistance() editingDistance=false end
+end)
+
+---------------------------------------
+-- PUXAR OBJETOS (CORRIGIDO)
+---------------------------------------
+function pullNearbyObjects()
+    local px,py,pz = getElementPosition(localPlayer)
+    for _,obj in ipairs(getElementsByType("object")) do
+        local id = getElementModel(obj)
+        if selectedIDs[id] then
+            local ox,oy,oz = getElementPosition(obj)
+            if getDistanceBetweenPoints3D(px,py,pz,ox,oy,oz) <= pullDistance then
+                setElementPosition(
+                    obj,
+                    ox + (px-ox)*pullSpeed,
+                    oy + (py-oy)*pullSpeed,
+                    oz + (pz-oz)*pullSpeed
+                )
+            end
+        end
+    end
+end
+
+---------------------------------------
+-- BINDS
+---------------------------------------
+bindKey(menuKey,"down",function()
+    menuOpen = not menuOpen
+    showCursor(menuOpen)
+end)
+
+bindKey(pullKey,"down",function()
+    addEventHandler("onClientRender",root,pullNearbyObjects)
+end)
+
+bindKey(pullKey,"up",function()
+    removeEventHandler("onClientRender",root,pullNearbyObjects)
+end)
