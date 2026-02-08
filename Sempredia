@@ -1,0 +1,19 @@
+-- Sempre Dia - Client Side
+local Lighting = game:GetService("Lighting")
+
+-- Configuração de dia
+local function setDay()
+    Lighting.TimeOfDay = "12:00:00" -- Meio-dia
+    Lighting.ClockTime = 12
+    Lighting.Brightness = 2
+    Lighting.ExposureCompensation = 0
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    Lighting.GlobalShadows = true
+end
+
+-- Força o dia sempre
+setDay()
+
+Lighting:GetPropertyChangedSignal("TimeOfDay"):Connect(setDay)
+Lighting:GetPropertyChangedSignal("ClockTime"):Connect(setDay)
