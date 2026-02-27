@@ -1,19 +1,211 @@
--- Sempre Dia - Client Side
+-- Day/Night Hub (Bonito + Movível) - Client Side
+local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
 
--- Configuração de dia
-local function setDay()
-    Lighting.TimeOfDay = "12:00:00" -- Meio-dia
-    Lighting.ClockTime = 12
-    Lighting.Brightness = 2
-    Lighting.ExposureCompensation = 0
-    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-    Lighting.GlobalShadows = true
+-- salva visual original
+local original = {
+	Brightness = Lighting.Brightness,
+	ExposureCompensation = Lighting.ExposureCompensation,
+	Ambient = Lighting.Ambient,
+	OutdoorAmbient = Lighting.OutdoorAmbient,
+	GlobalShadows = Lighting.GlobalShadows,
+	EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+	EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+	ShadowSoftness = Lighting.ShadowSoftness,
+	FogColor = Lighting.FogColor,
+	FogStart = Lighting.FogStart,
+	FogEnd = Lighting.FogEnd,
+	Technology = Lighting.Technology,
+}
+
+local function stripEffects()
+	for _, v in ipairs(Lighting:GetChildren()) do
+		if v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") then
+			pcall(function() v.Enabled = false end)
+		end
+	end
 end
 
--- Força o dia sempre
-setDay()
+local function restoreLook()
+	Lighting.Brightness = original.Brightness
+	Lighting.ExposureCompensation = original.ExposureCompensation
+	Lighting.Ambient = original.Ambient
+	Lighting.OutdoorAmbient = original.OutdoorAmbient
+	Lighting.GlobalShadows = original.GlobalShadows
+	Lighting.EnvironmentDiffuseScale = original.EnvironmentDiffuseScale
+	Lighting.EnvironmentSpecularScale = original.EnvironmentSpecularScale
+	Lighting.ShadowSoftness = original.ShadowSoftness
+	Lighting.FogColor = original.FogColor
+	Lighting.FogStart = original.FogStart
+	Lighting.FogEnd = original.FogEnd
+	Lighting.Technology = original.Technology
+end
 
-Lighting:GetPropertyChangedSignal("TimeOfDay"):Connect(setDay)
-Lighting:GetPropertyChangedSignal("ClockTime"):Connect(setDay)
+local mode = "none"
+local connA, connB
+
+local function disconnect()
+	if connA then connA:Disconnect() connA = nil end
+	if connB then connB:Disconnect() connB = nil end
+end
+
+local function setDay()
+	mode = "day"
+	stripEffects()
+	Lighting.TimeOfDay = "12:00:00"
+	Lighting.ClockTime = 12
+	Lighting.Brightness = 2
+	Lighting.ExposureCompensation = 0
+	Lighting.Ambient = Color3.fromRGB(255,255,255)
+	Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+	Lighting.GlobalShadows = true
+end
+
+local function setSoftNight()
+	mode = "night"
+	stripEffects()
+	Lighting.ClockTime = 18.5
+	restoreLook()
+end
+
+local function hook()
+	disconnect()
+	connA = Lighting:GetPropertyChangedSignal("TimeOfDay"):Connect(function()
+		if mode == "day" then setDay() elseif mode == "night" then setSoftNight() end
+	end)
+	connB = Lighting:GetPropertyChangedSignal("ClockTime"):Connect(function()
+		if mode == "day" then setDay() elseif mode == "night" then setSoftNight() end
+	end)
+end
+
+-- UI
+local gui = Instance.new("ScreenGui")
+gui.Name = "Wave_DayNightHub"
+gui.ResetOnSpawn = false
+gui.Parent = (gethui and gethui()) or (LP:WaitForChild("PlayerGui"))
+
+local main = Instance.new("Frame")
+main.Size = UDim2.fromOffset(260, 150)
+main.Position = UDim2.new(0, 30, 0.5, -75)
+main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = main
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 1
+stroke.Transparency = 0.35
+stroke.Parent = main
+
+local top = Instance.new("Frame")
+top.Size = UDim2.new(1, 0, 0, 36)
+top.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+top.BorderSizePixel = 0
+top.Parent = main
+
+local topCorner = Instance.new("UICorner")
+topCorner.CornerRadius = UDim.new(0, 12)
+topCorner.Parent = top
+
+local mask = Instance.new("Frame")
+mask.Size = UDim2.new(1, 0, 0, 12)
+mask.Position = UDim2.new(0, 0, 1, -12)
+mask.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+mask.BorderSizePixel = 0
+mask.Parent = top
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, -14, 1, 0)
+title.Position = UDim2.new(0, 14, 0, 0)
+title.Font = Enum.Font.GothamSemibold
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Text = "Wave • Day / Night"
+title.TextColor3 = Color3.fromRGB(235,235,235)
+title.Parent = top
+
+local sub = Instance.new("TextLabel")
+sub.BackgroundTransparency = 1
+sub.Size = UDim2.new(1, -20, 0, 18)
+sub.Position = UDim2.new(0, 10, 0, 44)
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 12
+sub.TextXAlignment = Enum.TextXAlignment.Left
+sub.Text = "Clique para alternar o horário"
+sub.TextColor3 = Color3.fromRGB(160,160,170)
+sub.Parent = main
+
+local function mkBtn(text, y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, -20, 0, 36)
+	b.Position = UDim2.new(0, 10, 0, y)
+	b.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+	b.BorderSizePixel = 0
+	b.Text = text
+	b.Font = Enum.Font.GothamSemibold
+	b.TextSize = 13
+	b.TextColor3 = Color3.fromRGB(240,240,240)
+	b.AutoButtonColor = false
+	b.Parent = main
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 10)
+	c.Parent = b
+
+	local s = Instance.new("UIStroke")
+	s.Thickness = 1
+	s.Transparency = 0.55
+	s.Parent = b
+
+	b.MouseEnter:Connect(function()
+		b.BackgroundColor3 = Color3.fromRGB(40, 40, 52)
+	end)
+	b.MouseLeave:Connect(function()
+		b.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+	end)
+
+	return b
+end
+
+local btnDay = mkBtn("☀️  Ficar de Dia", 68)
+local btnNight = mkBtn("🌙  Ficar de Noite (suave)", 108)
+
+btnDay.MouseButton1Click:Connect(function()
+	setDay()
+	hook()
+end)
+
+btnNight.MouseButton1Click:Connect(function()
+	setSoftNight()
+	hook()
+end)
+
+-- Drag (mover)
+local dragging = false
+local dragStart, startPos
+
+top.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if not dragging then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+	local delta = input.Position - dragStart
+	main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end)
