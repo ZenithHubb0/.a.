@@ -56,7 +56,7 @@ local function setDay()
 	stripEffects()
 	Lighting.TimeOfDay = "12:00:00"
 	Lighting.ClockTime = 12
-	Lighting.Brightness = 2
+	Lighting.Brightness = 1
 	Lighting.ExposureCompensation = 0
 	Lighting.Ambient = Color3.fromRGB(255,255,255)
 	Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
